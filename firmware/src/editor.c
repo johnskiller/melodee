@@ -348,8 +348,8 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
     if (ed_native_handle(cmd, a, na)) { ed_send(); return; }
     switch (cmd) {
 #if MELODEE_USB_AUDIO
-    case ED_AUDIO_STATS: {                         /* flags: 1 resets maxima, 2 voices, 4 cores, 8 resource/cache banks */
-        uint32_t snapshot[47] = {0}, k, count = na && (a[0] & 8u) ? 47u : na && (a[0] & 4u) ? 32u : na && (a[0] & 2u) ? 26u : 20u;
+    case ED_AUDIO_STATS: {                         /* flags: 1 resets maxima, 2 voices, 4 cores, 8 memory, 16 part victims */
+        uint32_t snapshot[55] = {0}, k, count = na && (a[0] & 16u) ? 55u : na && (a[0] & 8u) ? 47u : na && (a[0] & 4u) ? 32u : na && (a[0] & 2u) ? 26u : 20u;
         fm1_irq_off();
         snapshot[0] = ua.play_alt;
         snapshot[1] = ua.cap_alt;
@@ -394,7 +394,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
             snapshot[23] = fm1_core1_fault.count;     /* CPU1 faults: either retires the worker */
         }
 #endif
-        if (count == 47u) {
+        if (count >= 47u) {
             snapshot[32] = fm1_cache.status;
             snapshot[33] = fm1_cache.con_before;
             snapshot[34] = fm1_cache.data_before;
@@ -414,6 +414,11 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
                     (uintptr_t)resource[r].ptr < (uintptr_t)_resource_cache_end)
                     snapshot[46] += resource[r].size;
         }
+        if (count == 55u)
+            for (uint32_t p = 0; p < NPART; p++) {
+                snapshot[47u+p] = shed_part[p];
+                snapshot[51u+p] = voice_kills_part[p];
+            }
         if (na && (a[0] & 1u)) {
             ua.poll_max_ticks = ua.service_max_ticks = melodee_dbg.max_us = 0;
 #if MELODEE_DUAL_CORE
@@ -421,7 +426,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
 #endif
         }
         fm1_irq_on();
-        ed_b(count == 47u ? 5u : count == 32u ? 4u : count == 26u ? 3u : 2u);
+        ed_b(count == 55u ? 6u : count == 47u ? 5u : count == 32u ? 4u : count == 26u ? 3u : 2u);
         for (i = 0; i < count; i++)
             for (k = 0; k < 5u; k++)
                 ed_b(snapshot[i] >> (7u * k));
@@ -556,9 +561,8 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
     case ED_SET:
         if (na < 2u || !(d = ed_desc(a[0], a[1], &vp)))
             return;
-        if (cmd == ED_SET && na >= 4u && !(chain_busy() && !a[0] && a[1] >= P_SLEN && a[1] <= P_SGATE)) {
-            if (a[0] == 1 && a[1] == G_ENGSEL) {          /* engine change: the safe path (1 without MELODEE_FM4:
-                                                           * DIGITAL's first preset, as FM6) */
+        if (cmd == ED_SET && na >= 4u && !(a[0] ? global_reserved(a[1]) : param_reserved(a[1])) && !(chain_busy() && !a[0] && a[1] >= P_SLEN && a[1] <= P_SGATE)) {
+            if (a[0] == 1 && a[1] == G_ENGSEL) {          /* engine change: the safe path */
                 set_engine((uint32_t)clamp(ed_rv(a + 2), 0, NENGINES - 1));
             } else if (d->max > d->min) {
                 *vp = (int16_t)enum_orig(d, clamp(ed_rv(a + 2), d->min, d->max));
@@ -621,11 +625,6 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
     case ED_PRESET:                                        /* engine, preset */
         if (na < 2u || a[0] >= NENGINES)
             return;
-#if !MELODEE_FM4
-        if (a[0] == ENGI_DIGITAL)                          /* a DIGITAL preset (retired): its sound, as FM6 */
-            fm4_load_preset(TSEL, a[1]);
-        else
-#endif
         {
             if (a[0] != TSEL->eng_req)
                 set_engine(a[0]);
@@ -660,7 +659,8 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
         room = sizeof ed_out - ed_n - 2u - 18u - 4u - 1u;
         for (i = s0; i < en->npresets && n < 127u; i++, n++) {
             uint32_t len = 0;
-            while (len < 20u && en->presets[i].name[len])
+            const char *nm = eng_preset(en, i)->name;
+            while (len < 20u && nm[len])
                 len++;
             if (len + 1u > room)
                 break;
@@ -669,7 +669,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
         ed_b(a[0]);
         ed_b(n);
         for (i = 0; i < n; i++)
-            ed_str(en->presets[s0 + i].name, 20);
+            ed_str(eng_preset(en, s0 + i)->name, 20);
         for (i = 0; i < 2u; i++)                           /* then the two edit-page titles */
             ed_str(en->page_title[i], 8);
         ed_b(en->npresets);                                /* then all presets and this page's first: the */
@@ -866,7 +866,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
             return;
         t = &trk[a[0]];
         d = ed_tdesc(t, a[1]);
-        if (na >= 4u && !(chain_busy() && a[1] >= P_SLEN && a[1] <= P_SGATE)) {
+        if (na >= 4u && !param_reserved(a[1]) && !(chain_busy() && a[1] >= P_SLEN && a[1] <= P_SGATE)) {
             if (d->max > d->min)                           /* as SET: clamped; a fixed value stays */
                 t->p[a[1]] = (int16_t)enum_orig(d, clamp(ed_rv(a + 2), d->min, d->max));
             (void)motion_capture(t, a[1], t->p[a[1]]);
@@ -963,6 +963,7 @@ static void ed_service(void)
     uint32_t n;
     ed_sync();                                             /* v2 pushes (while watched) */
     if(!ota_frame_get(&p,&n))return;
+    if(general_sysex_frame(p,n)){ota_frame_done();return;}
     if(p5_native_frame(p,n)){ota_frame_done();return;}
     if (n < 4u || p[0] != ED_HDR0 || p[1] != ED_HDR1 || p[2] != ED_HDR2)
         return;

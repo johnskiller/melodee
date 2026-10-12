@@ -12,7 +12,7 @@ It saves a complete backup first. If your firmware cannot export one, you can se
 **Skip backup** and confirm that Melodee music, sounds and settings may be lost.
 
 Multi-engine synthesizer and sequencer firmware for the M-VAVE FM-1. Current release:
-**Melodee 1.1.0** ([what's new](#whats-new-in-110)).
+**Melodee 1.2.1** ([what's new](#whats-new-in-121)).
 
 Melodee is a modified version of [Felucca](https://github.com/hugelton/Felucca) by Leo Kuroshita
 ([@kurogedelic](https://github.com/kurogedelic)), [Hügelton Instruments](https://hugelton.com), and
@@ -23,6 +23,34 @@ runs Felucca.
 - Install: [web installer](https://keremimo.github.io/melodee/) (Chrome or Edge, USB), or `tools/fm1_install.py` from a terminal
 - Editor: [web editor](https://keremimo.github.io/melodee/webapp/editor/)
 - Build: [BUILDING.md](BUILDING.md)
+
+## What's new in 1.2.1
+
+This release makes room for more voices. External effects are gone, the audio engine runs from fast
+internal RAM, and the firmware is about 115 KB smaller. Standard (dual-core) and Single core firmware
+are both available in the installer and release downloads.
+
+- **No external effects:** distortion, the SLICER, chorus, delay, reverb and the FX layer (repeat,
+  reverse, filter sweeps, tape stop, freeze, harmonizer, flanger, phaser, FX LATCH and punch-in) are
+  removed. The panel's FX button has no action and CC91 / CC93 do nothing. Older songs and presets
+  still load; their former effect settings and automation are ignored, so they play dry.
+- **Fewer cut notes:** the whole audio path runs from internal RAM, and the shared voice budget rises
+  from 16 to 18 units while the second core is online. Per-engine caps and overload protection remain.
+- **ANALOG and DIGITAL retired:** track 1 now powers on with PROPHET FUNK BASS II. Saved ANALOG and
+  DIGITAL sounds keep their place but play silent.
+- **Older formats:** projects, templates and presets saved by Melodee 1.0 or later load as before.
+  Anything older shows OLD FORMAT and stays untouched until you choose to replace it; the device asks
+  first. A backup the device cannot read is refused before anything is written. If you still have
+  projects or presets from before 1.0, open and save them with 1.1.0 before updating.
+- **Import SysEx:** a DX7, CZ-1, Prophet or Melodee preset sent over USB opens its USER list. Pick the
+  destination and choose **Import here**; occupied slots ask before they are replaced.
+- **Bulk presets:** hold OCT+ and turn a knob to select a range of USER or STORE slots, then send or
+  erase them together.
+- **Note tools:** move and copy notes or ranges at quarter-step boundaries, and quantize a pattern or
+  a selection to 1, 0.5 or 0.25 step, each with one undo.
+- **Fixes:** local PLAY keeps running until MIDI Start, Continue or Stop takes over; no pop at power-on;
+  a list picker no longer covers half of a neighbouring value; Prophet parts no longer add a DC offset
+  to the mix and USB stems; settings backups with recording preferences restore again.
 
 ## What's new in 1.1.0
 
@@ -98,8 +126,8 @@ and patterns; settings represented by multiple patch bytes can use multiple even
 - **Faster display:** the firmware sends only the areas that changed to the LCD. Scrolling NOTES,
   moving its playhead and turning most controls no longer resend the whole screen.
 - **More sound and performance:** dual-core rendering is on by default, DSP signal paths use the
-  FM-1's native single-precision FPU, the shared delay returns in DIGI and TAPE modes, and the
-  Felucca 1.4 modulation, performance-FX, stereo-spread, HALL and screen-sleep work is included.
+  FM-1's native single-precision FPU. Modulation, stereo spread and screen sleep are included;
+  all external effects and their hold/latch controls have been removed.
 - **808 and 909 kits:** both DRUM kits synthesize every voice in real time. The 909 kick, snare,
   toms, rim and clap use circuit models from
   [fm1-x0x](https://github.com/charlesvestal/fm1-x0x/tree/201e5c5c1ac056a028a006bd1eabb23ac1bb174d);
@@ -122,7 +150,7 @@ and patterns; settings represented by multiple patch bytes can use multiple even
 **Upgrading from 0.13.1:** the Prophet user banks move to their new flash location on first boot.
 Export important Prophet programs, or keep the installer's complete backup, before downgrading:
 older firmware does not know the new location. The four legacy project objects are retired and are
-not read by 1.0.0. Sounds saved before the delay returned load with their delay send at zero.
+not read by 1.0.0. Former effect fields in older saves are ignored.
 Tracks and user presets that used LOFI keep their engine number and load as SID with LOFI's control
 values, so they sound different; choose a SID preset to start again.
 
@@ -175,9 +203,8 @@ erases the Prophet user slots: export them, or keep the installer's backup, firs
   take, deletes selected hits and supports undo without changing neighbouring notes
 - **Native user presets:** 64 FM6 voices and 128 CZ-1 tones in separate collections, alongside 64 general
   user presets. Scroll and favorite them in PRESETS; import/export Dexed/DX7 and Casio .syx in the editor.
-  Native slots store only the tone, so loading keeps the track's effects and patterns
+  Native slots store only the tone, so loading keeps the track's mix and patterns
 - **FM6 diagrams:** MARK I algorithms 4 and 6 show their longer feedback paths
-- **FX change:** the shared delay is retired to make room for expanded recording; THROW now feeds reverb
 
 **Upgrading from 0.11 / 0.11.1:** existing projects, templates, settings and presets migrate.
 Expanded recordings and new scale IDs need 0.12; older firmware cannot reproduce those additions.
@@ -198,7 +225,7 @@ Microtonal MIDI OUT sends degree addresses, so an external synth needs the same 
 - **Every tone value on the device:** 38 EDIT pages for the lines, detune, vibrato, windows and the six
   envelopes, and CZ TOOLS (NAME, copy line 1 > 2 or 2 > 1, COMPARE). A value that has no effect on the
   tone as it is (line 2 in LINE1, steps after END, vibrato without DEPTH) is drawn dim
-- **Casio SysEx over MIDI:** CZ editors and librarians can send tones to a CZ-1 track and request them
+- **Casio SysEx over MIDI:** CZ editors and librarians can send named tones to the CZ-1 user slots and request track tones
 - **PHASE** keeps its own six presets and gains LINK / SPLIT: separate native DCO, DCW and DCA envelopes
 - **Installer:** **Return to official V15** can skip the backup when the firmware cannot export one
 - **Removed:** the SAMPLE, GRAIN and SLICE engines and the custom drum kit (DRUM plays the 808)
@@ -255,17 +282,9 @@ user presets saved by earlier Melodee versions are not imported, and the user sa
 - **Arpeggiator** with REPEAT and a beat LED, 70 scales with a white-key mode, glide,
   MONO / LEGATO / UNISON
 - **Modulation matrix:** 4 slots per track, MIDI controllers as sources
-- **Effects:** distortion and the SLICER per track; chorus, delay and reverb sends (the delay as
-  DIGI or TAPE, either ping-pong: fm1-x0x's tape delay; the reverb as ROOM, SPRING or HALL); master limiter
-- **FX layer:** hold FX for repeat, reverse, filter sweeps, tape stop, freeze, a harmonizer
-  (OCT UP / OCT DN with shimmer), flanger and phaser, and mutes on the black keys; any effect on any
-  white key (hold the key, turn PRESETS; EDIT restores it), MENU > FX LATCH toggles instead of holding;
-  double-press FX within 300 ms to keep punch-in mode open with both hands free, then press FX again to close it.
-  The keys punch effects while held; the knobs change only performance macros, leaving the preset untouched.
-  KNOB 4 increases DEPTH clockwise (or SHIMMER while OCT UP / OCT DN plays).
-  GLO, SCL and EDIT also support double-press locking
-- **Quick layers:** hold FX, GLO, SCL or EDIT for shortcuts on the keys and knobs; multi-level undo
-  (SAVE held); REC on every page; OCT+ confirms, OCT- goes back
+- **Dry mixer:** track level, pan and synth voice spread, with output protection; no effects or sends
+- **Quick layers:** hold GLO, SCL or EDIT for shortcuts on the keys and knobs; double-press to lock
+  a layer. Multi-level undo (SAVE held); REC on every page; OCT+ confirms, OCT- goes back
 - **Presets:** browse by category (BASS, LEAD, PAD, KEYS, ORGAN, STRING, BRASS, WIND, PLUCK, BELL, DRUM, FX), favourites or
   RECENT, with knob acceleration; factory presets, 64 general slots, 64 native FM6 slots, 128 native CZ-1 slots, 128 native Prophet slots and 4 projects, named on the device;
   a startup project and a template for new projects; compatible upstream projects from earlier versions load
@@ -280,13 +299,15 @@ user presets saved by earlier Melodee versions are not imported, and the user sa
   while its note sounds, MIDI in too, and the idle buttons glow; REC breathes while armed and stopped, PLAY while
   counting in; the HOME-held menu's LIGHTS sets the level (OFF: only what is pressed, engaged or selectable)
 - **USB:** class-compliant MIDI in and out; **Melodee Out** plays the computer through the FM-1,
-  **Melodee In** records four mono tracks (one channel per track, after level and before pan, sends
-  and master effects). Both support 16/24-bit audio at 44.1 kHz; each can be disabled in the
+  **Melodee In** records four mono tracks (one channel per track, after level and before pan and
+  master gain/output protection). Both support 16/24-bit audio at 44.1 kHz; each can be disabled in the
   HOME-held menu's USB AUDIO setting. No driver needed
 - **MIDI:** USB and TRS MIDI in; channels 1–4 play tracks 1–4, channel 10 the first DRUM track (GLO >
   SYSTEM **DRUM**: any channel or OFF; no DRUM track: the selected one), other channels the selected track,
   and the keys send on the track's channel; pitch bend, sustain, panic; clock from internal, USB or TRS;
   GLO > SYSTEM KNOB 1 shows the USB or the TRS input's status (RX while it receives; both always play)
+  Local PLAY uses the internal tempo until the selected input sends Start, Continue or Stop. Clock
+  pulses alone do not take over. Changing the clock source clears this transport selection.
 - **Web:** editor for every parameter (with a 6-operator FM patch editor), step grid, mixer,
   preset library and FM6 voice editor; full backup and restore; return to the official firmware
 
@@ -300,20 +321,28 @@ user presets saved by earlier Melodee versions are not imported, and the user sa
 - **BPM**, the song's **SWG** and the selected track's playback **QNT** are on **SEQ > TEMPO**:
   the project's, saved and loaded with it (power-on: the BOOT project's, the template's or 120);
   GLO > GLOBAL keeps CLK and TUNE, the device's
-- FX, SCL, ENV, LFO, EDIT, GLO, SAVE, ARP and SEQ open their pages; press again for the next page.
+- SCL, ENV, LFO, EDIT, GLO, SAVE, ARP and SEQ open their pages; press again for the next page.
   HOME returns home
-- **Held:** FX, GLO, SCL and EDIT open their quick layers; SAVE is undo, HOME the menu, SEQ the PATTERNS grid with
+- **Held:** GLO, SCL and EDIT open their quick layers; SAVE is undo, HOME the menu, SEQ the PATTERNS grid with
   the song under it, REC captures (below).
 - **Undo:** hold SAVE to undo the last sound or pattern load or Capture; hold it again to go further back (up to 8
-  levels with cache RAM, else one); while SAVE is held, OCT- undoes and OCT+ redoes. On the step pages SAVE's undo
+  levels); while SAVE is held, OCT- undoes and OCT+ redoes. On the step pages SAVE's undo
   covers the step edits first
-  When editing synth steps, SCL and EDIT use the editing controls below instead; FX keeps its layer
+  When editing synth steps, SCL and EDIT use the editing controls below instead.
+- The panel's FX button has no action.
 - PLAY starts and stops all four tracks; REC arms or disarms the selected track without starting the
   transport; **REC + PLAY** arms it and starts recording in one gesture
 - On Stage, OCT− / OCT+ shift the octave (both: reset). Everywhere else OCT+ enters, opens or
   confirms and OCT− goes back. During synth step editing they move the step cursor
 - Save a sound: stop, tap SAVE, choose USER and a slot, press OCT+ to open its sheet with
   **Save here** selected, then OCT+ again (name it with the keys)
+- **Import SysEx:** a valid USB DX7, CZ-1, Prophet or Melodee preset opens its matching USER list,
+  preserving the full native name. Choose a destination with KNOB 1, press OCT+ and choose **Import here**.
+  A DX7 cartridge needs 32 consecutive slots starting there. Occupied slots ask before replacement;
+  saving requires stopped playback. **Cancel import** leaves the slots unchanged. Imports do not load a track.
+- **Bulk presets:** hold OCT+ and turn SELECT, KNOB 1 or KNOB 2 to select a contiguous range in USER
+  or STORE. Release, then tap OCT+ for **Send selected** over USB SysEx, **Erase selected** (one confirmation),
+  or **Clear selection**. Empty slots are skipped. Single-slot **Send** is also available in USER.
 - **New song:** SAVE > PROJECT, turn KNOB 1 past TMPL to **NEW**, KNOB 3 to pick it and OCT+ (unsaved changes ask
   first). Set the key (KNOB 1 ROOT, 2 SCALE) and tempo (KNOB 3), OCT+; give each track a role with KNOB 1–4 (KEEP,
   DRUMS, BASS, CHORDS, LEAD, PAD), OCT+ creates it: your template's sounds (none saved: the power-on ones), a role's
@@ -383,20 +412,27 @@ The highlighted note has a bright outline; the playhead is a separate moving lin
 - **KNOB 2 PITCH** changes the highlighted pitch. On an empty manual step, it inserts a note;
   playing keys or MIDI enters a note or chord, then advances when released. Playing on a recorded
   interval auditions without replacing the take. During live recording, keys and MIDI record normally.
-- **KNOB 3 LENGTH** extends or shortens a note. Recorded durations change by one nominal step,
-  preserving their fractional length; hold **ENV** for fine adjustments of 1/16 step. Ordinary step
-  notes resize their tie tails and stop before another note. Entered chord pitches share a step's
-  length and velocity (marked **ALL** on those cards); recorded chord pitches have independent lengths
-  and velocities. Adjusting a shared property highlights the affected chord.
+- **KNOB 3 LENGTH** extends or shortens a note at hard quarter-step boundaries (0.25, 0.50, 0.75,
+  1.00, 1.25…); hold **ENV** for 1/16-step boundaries. Adjusting an ordinary step note while stopped
+  converts its chord and ties into precise timed notes, retaining their pitches and velocities.
+  Recorded chord pitches then have independent lengths. Held-key entry and ENV + SELECT retain
+  their whole-step tie controls for manual notes.
 - **KNOB 4 VEL** adjusts velocity from 1 to 127. Turning it on an accented manual note makes the
   displayed velocity its playback velocity. Hold **ENV** and turn KNOB 4 to switch a manual note's
   **SLIDE** on or off; the card changes to SLIDE while ENV is held.
 - **PRESETS** zooms around the selected interval from 16 steps down to one. Selection stays put.
 - **OCT+** places a note or drum hit in empty space, or opens the selected note/hit's sheet for
-  Length, Velocity, Chance, Slide and Delete. OCT− closes it or goes back.
-- Hold **SCL** and turn **SELECT** or **KNOB 1** to move the selected note. Recorded notes keep their
-  fractional onset, duration and velocity; manual notes move with their ties. Moving into an occupied
-  manual note or tie is blocked. Hold **ENV** and turn SELECT or KNOB 1 to resize instead.
+  Length, Velocity, Chance, Slide, Move, Copy and Delete. OCT− closes it or goes back.
+- Choose **Move note** from the note's sheet, then turn **KNOB 1** to move it while stopped.
+  Note durations and velocities stay intact; moving into an unselected manual note or tie is blocked.
+  Hold **ENV** and turn SELECT or KNOB 1 to resize instead.
+- Hold **OCT+** and turn SELECT, KNOB 1 or KNOB 2 to select a range; turn **KNOB 1** to move its notes
+  at quarter-step boundaries, preserving relative timing, durations and velocities. Tap or hold OCT+ for
+  **Copy: KNOB 1**, **Quantize**, or **Clear selection**. A single note's sheet offers **Move note** and **Copy note**;
+  choose either, then turn KNOB 1. After copying, KNOB 1 moves the duplicate; OCT- finishes the move.
+  Copies and moves wrap around the loop. Hold OCT+ without a range to open the pattern tools: **Quantize** snaps
+  the pattern's note onsets, or only the selected range when one exists. On the Quantize row, KNOB 1 chooses
+  **1**, **0.5**, or **0.25 step**, and OCT+ applies it. Durations and velocities stay intact; SAVE held undoes it.
 - Tap **EDIT** to delete the highlighted pitch. Recorded deletion affects just that hit; manual
   chords retain their other pitches and ties. Deleting the final manual pitch clears its tie tail.
   Using another control while EDIT is held consumes the tap.
@@ -410,6 +446,8 @@ The highlighted note has a bright outline; the playhead is a separate moving lin
 - Hold **SAVE** to undo. **EDIT/SAVE + OCT− / OCT+** undo/redo up to eight edits, restoring note data
   and focus. A new edit clears redo. Recording, external edits, changing track, bank or loop length
   start a fresh history. With no manual edit to undo, held SAVE retains sound/pattern-load undo.
+  Fractional manual conversions and grouped moves/copies have one complete undo/redo snapshot.
+  Starting playback releases that temporary snapshot; these transforms require stopped playback.
 
 Recorded properties and deletion are editable during playback; stop live recording before editing
 those notes. Live recording follows the playhead; ordinary playback leaves the editing focus alone.
@@ -434,12 +472,10 @@ replaces that event. **RECORDING FULL** leaves existing recordings intact; clear
 recorded steps makes space for new takes. Notes held longer than 128
 nominal steps are capped at that duration.
 
-0.12 retired the shared FX delay to free 128 KiB for recording. It is back as a port of
-[fm1-x0x](https://github.com/charlesvestal/fm1-x0x)'s tape delay (from
-[schwung-space-delay](https://github.com/charlesvestal/schwung-space-delay)) (FX > DLY: TIME, FDBK, TONE, MIX;
-DLY 2: TYPE DIGI / TAPE / DG-PP / TP-PP, WEAR), a 1.49 s line at 22.05 kHz borrowed only while it
-sounds. Projects, templates and presets saved before it load with their delay sends at 0, so nothing
-echoes until a track's DLY send is turned up. THROW feeds the delay and the reverb.
+External effects have been removed from every build: no distortion insert, chorus, delay, reverb,
+slicer or performance effects. Their former controls, key assignments and latch preferences are
+absent. Older projects and presets still load their notes and synth settings; retired effect
+values and automation have no effect on playback.
 Older 152-note recordings keep their original timing when loaded and saved in the expanded format.
 
 With **CLK TRS** or **CLK USB**, musical timing follows MIDI clock pulses directly, so tempo
@@ -472,7 +508,7 @@ FM6 and CZ-1 have independent native user collections: F001–F064 store the 128
 voice, and Z001–Z128 store the complete 144-byte Casio tone. They appear alongside factory tones
 in normal global and engine-specific preset scrolling, and can be favorited. SAVE > USER selects
 the current engine's collection; FM6 > STORE uses those same FM6 slots. Native saves exclude
-Felucca effects, envelopes, modulation settings and patterns. Loading keeps these track settings;
+Felucca envelopes, modulation settings and patterns. Loading keeps these track settings;
 when changing engines, only engine-specific controls receive their defaults.
 
 The 64 general U01–U64 slots remain available for other engines. First boot copies saved FM6
@@ -514,9 +550,9 @@ calibration; the FPU conversion does not establish hardware fidelity.
 - **DRUM**: synthesized TR-808 and TR-909 kits with the General MIDI key map. Every drum has its
   own tuning, decay, tone, attack/snappy and level controls; recorded hits can override pitch and length
 
-PHASE, VOICE, NOISE, TRIO, WHEEL and PHYS are retired. Their engine IDs, saved edit values and
-favourite bits remain reserved; old tracks using these engines are silent. PROPHET replaces ANALOG
-in the engine list; ANALOG still renders existing sounds.
+ANALOG, DIGITAL, PHASE, VOICE, NOISE, TRIO, WHEEL and PHYS are retired. Their engine IDs, saved edit
+values and favourite bits remain reserved; old tracks using these engines are silent. PROPHET replaces
+ANALOG in the engine list, and track 1 powers on with PROPHET FUNK BASS II.
 
 PROPHET opens on It's a Prophet 5 (or on user slot P001 once it holds your own program). PRESETS lists
 INIT and Sequential's 200 factory programs, then the native user slots P001–P128. In the web editor,
@@ -526,8 +562,6 @@ notes: [docs/PROPHET5_PROTOTYPE.md](docs/PROPHET5_PROTOTYPE.md).
 
 The DIGITAL engine of 0.9 has been replaced by FM6: projects and presets with DIGITAL sounds load
 as FM6 sounds converted from them.
-
-**SLICER** (FX page, every track): a tempo-synced 16-step gate or stutter, with 16 patterns.
 
 CZ-1 opens with a native INIT TONE; PRESETS then lists Casio's 64 CZ-1 preset tones (A-1 BRASS 1 to
 H-8 TYPHOON SOUND). The separate 128-slot user collection starts empty. Imported Casio tones use
@@ -551,7 +585,7 @@ calibration; this build does not establish near-identical CZ-1 audio.
 SAMPLE, GRAIN and SLICE and all recorded sample material have been removed. Engine numbers 4, 8
 and 13 remain reserved so existing projects do not accidentally select another instrument. Old tracks
 using those engines are silent until another sound is chosen. Historical separate GM drum parts load
-as the synthesized 808 kit. SLICER remains a gate/stutter effect on synthesized audio.
+as the synthesized 808 kit.
 
 
 ## Scale keyboard
@@ -632,12 +666,11 @@ You can leave a tip with [ko-fi](https://ko-fi.com/keremimo).
 - VOICE engine: after [klattsch](https://github.com/tgies/klattsch) by Tony Gies (MIT); formant data from Klatt (1980) and Hillenbrand et al. (1995)
 - Native CZ engine: uPD933 model by Devin Acker in [MAME](https://github.com/mamedev/mame/blob/master/src/devices/sound/upd933.cpp) ([BSD-3-Clause](LICENSES/BSD-3-Clause-uPD933.txt))
 - PHYS engine: models ported from [DaisySP](https://github.com/electro-smith/DaisySP) by Electrosmith and Emilie Gillet ([MIT](LICENSES/MIT-DaisySP.txt)) and from Emilie Gillet's [eurorack](https://github.com/pichenettes/eurorack) code ([MIT](LICENSES/MIT-Rings.txt))
-- Delay: the tape delay of [schwung-space-delay](https://github.com/charlesvestal/schwung-space-delay) by Charles Vestal ([MIT](LICENSES/MIT-schwung-space-delay.txt)), by way of [fm1-x0x](https://github.com/charlesvestal/fm1-x0x) by Charles Vestal (GPL-3.0; its DIGI mode after [9W9](https://github.com/athousanddetails/schwung-9W9) by athousanddetails, GPL-3.0), in fixed point
 - SID engine: after [reSID](https://github.com/libsidplayfp/resid) by Dag Lem (GPL-2.0-or-later); its samples of a real
   6581's and 8580's combined waveforms are included as data ([assets/resid](assets/resid/README.md))
 - FM6 engine: msfa from [Dexed](https://github.com/asb2m10/dexed) by Google Inc. and Pascal Gauthier ([Apache-2.0](LICENSES/Apache-2.0-msfa.txt))
 - Package format and boot files: [JieLi AC79 SDK](https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK) ([Apache-2.0](LICENSES/Apache-2.0.txt); three of its files are in every package, none in this tree)
-- Contributions: [Charles Vestal](https://github.com/charlesvestal) (knob acceleration, 808/909 models and tape delay),
+- Contributions: [Charles Vestal](https://github.com/charlesvestal) (knob acceleration and 808/909 models),
   [keremimo](https://github.com/keremimo) (white-key scales, #2), [ChanceTheMaker](https://github.com/ChanceTheMaker)
   (TRS MIDI, bend, sustain and clock, palettes, favourites, editor display settings: #8, #10, #11, #12),
   [andreahaku](https://github.com/andreahaku) (sample recording and trim, #29; SLICE manual slices and tests, #27, #22)

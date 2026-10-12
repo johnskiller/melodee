@@ -256,7 +256,7 @@ static void arp_step(track_t *t, uint32_t n, uint32_t gate_n)
         return;
     if (t->arp_pos >= 0xFFFFFFFu)
         t->arp_pos = 0;
-    else if (song.g[G_CLOCK])
+    else if (midi_sync_active)
         t->arp_pos -= period + (uint32_t)((t->arp_idx & 1u) ? sw : -sw);
     else
         t->arp_pos = 0;
@@ -363,12 +363,14 @@ static void cap_on(const track_t *t, uint32_t note, uint32_t vel)
 static void cap_off(const track_t *t, uint32_t note)
 {
     uint32_t i, k = trk_index(t);
-    for (i = 0; i < 32u && i < cap_w - cap_from && i < CAP_N; i++) {
+    /* A dense four-track jam can put more than 32 onsets between a note's
+     * press and release. Close all matching retained onsets, as input_off's
+     * source ownership already waits for the final release of this pitch. */
+    for (i = 0; i < cap_w - cap_from && i < CAP_N; i++) {
         cap_ev_t *e = &cap_ev[(cap_w - 1u - i) % CAP_N];
         if (e->tr == (k | 128u) && e->note == note) {
             e->dur = (uint16_t)cap_len(e, cap_now(t));
             e->tr = (uint8_t)k;
-            return;
         }
     }
 }
@@ -612,60 +614,6 @@ static void input_off(track_t *t, uint32_t note)
     if (!recording_owns(t, note)) trk_note_off(t, note); /* other mode (ARP switched while held) */
 }
 
-/* the effect of key k in the FX layer (PF_N none): the first PF_M1 white keys (F3 .. A4) in order, black keys
- * 1..4 (F#3 G#3 A#3 C#4) the track mutes */
-static uint32_t perf_key(uint32_t k)
-{
-    uint32_t p = key_place(k);
-    return !key_black(k) ? (p < PF_KEYS ? perf_map[p] : PF_N) : p < NTRK ? PF_M1 + p : PF_N;
-}
-
-static uint8_t kb_fx[27];
-static __attribute__((noinline)) void perf_key_press(uint32_t k, int down)
-{
-    uint32_t e, j;
-    if (down) {
-        e = perf_key(k);
-        kb_fx[k] = (uint8_t)(e + 1u);
-        perf_press(e, 1);
-        return;
-    }
-    if (!kb_fx[k])
-        return;
-    e = kb_fx[k] - 1u;
-    kb_fx[k] = 0;
-    for (j = 0; j < 27u; j++)
-        if (kb_fx[j] == e + 1u)
-            return;
-    perf_press(e, 0);
-}
-
-/* the map changed (ui_layer.c: PRESETS with a key held, EDIT, a settings load): a white key held takes its new
- * effect at once (the old one let go); FX LATCH: a latched effect of the key's becomes the new one */
-static __attribute__((noinline)) void perf_key_remap(void)
-{
-    uint32_t k, e, o;
-    perf_remap = 0;
-    for (k = 0; k < 27u; k++) {
-        if (!kb_fx[k] || key_black(k) || (o = kb_fx[k] - 1u) == (e = perf_key(k)))
-            continue;
-        if (!perf_latch_on) {
-            perf_key_press(k, 0);
-            perf_key_press(k, 1);
-            continue;
-        }
-        kb_fx[k] = (uint8_t)(e + 1u);
-        if (o < PF_N && ((perf_latched >> o) & 1u)) {
-            perf_latched &= ~PF_BIT(o);
-            if (e < PF_N) {
-                perf_latched |= PF_BIT(e);
-                perf_ord[e] = ++perf_seq;
-            }
-        }
-    }
-}
-
-
 /* key k plays kb_note[k] on track t: its chord (chord.c; the note alone with CHRD OFF). A note another key
  * holds already sounds: it is not started again (nor sent to MIDI OUT); the key keeps its notes */
 static void key_on(uint32_t k, track_t *t)
@@ -718,7 +666,6 @@ static __attribute__((noinline)) void kb_lat(uint32_t k)
 static void keyboard_block(void)
 {
     uint32_t cur = fm1_in.notes, ch, k;
-    if (perf_remap) perf_key_remap();
     ch = cur ^ kb_prev;                           /* keys also sound while entering steps */
     if (!ch)
         return;
@@ -729,10 +676,9 @@ static void keyboard_block(void)
             kb_trk[k] = song.sel;
             if (kb_asleep) { kb_note[k]=KB_SILENT; continue; }
             if ((fm1_in.buttons & kb_mask) || kb_lock) {       /* a layer's button held: the key is the layer's (ui_layer.c), */
-                kb_note[k] = KB_SILENT;           /* with FX an effect (perform.c) */
+                kb_note[k] = KB_SILENT;           /* a quick-layer key */
                 kb_layer |= 1u << k;
-                if ((fm1_in.buttons & perf_mask) || (kb_lock & 2u))
-                    perf_key_press(k, 1);
+
                 continue;
             }
             if (song.grid == 2u)                  /* NAME (ui_name.c): every key types, none sounds */
@@ -750,7 +696,6 @@ static void keyboard_block(void)
         } else {
             if ((kb_layer >> k) & 1u) {
                 kb_layer &= ~(1u << k);
-                perf_key_press(k, 0);
                 continue;
             }
             if (kb_note[k] == KB_SILENT)
@@ -808,6 +753,7 @@ static __attribute__((noinline)) void audition_tick(uint32_t n)
 /* -------------------------------------------------------- sequencer --- */
 static void seq_start(void)
 {
+    cin_left = 0; /* MIDI Start also cancels a pending local count-in. */
     uint32_t i;
     seq_erase_request = 0;
     seq_erase_transport++;
@@ -829,8 +775,6 @@ static void seq_start(void)
     beat_pos = 0; beat_n = 0;                      /* the ARP LED's beat from the top too */
     song.playing = 1;
     if (click_wanted()) click_req=2;
-    slicer_start();                                /* slicer.c: its step 0 with the sequencer's */
-    perf_start();                                  /* perform.c: its 1/16 grid too */
 }
 
 static void seq_release(track_t *t)
@@ -854,7 +798,7 @@ static void seq_stop(void)
     seq_erase_request = 0;
     seq_erase_transport++;
     song.playing = 0;
-    if (song.g[G_CLOCK])                           /* external clock: the arp stops with the transport, */
+    if (midi_sync_active)                           /* external clock: the arp stops with the transport, */
         for (i = 0; i < NPART; i++)                /* its sounding note too (HOLD keeps the latched chord) */
             if (trk[i].arp_note)
                 arp_off(&trk[i]);
@@ -1039,7 +983,7 @@ static void seq_advance(uint32_t n)
     for (i = 0; i < NTRK; i++)
         seq_tick(&trk[i], n);
     for (i = 0; i < NPART; i++)
-        arp_step(&trk[i], n, n);
+        arp_step(&trk[i], song.playing || !song.g[G_CLOCK] ? n : 0u, n);
     beat_pos += n;
     while (beat_pos >= beat) {
         beat_pos -= beat;
@@ -1052,29 +996,16 @@ static void seq_advance(uint32_t n)
 static void events_block(uint32_t n)
 {
     uint32_t i, pr;
-    uint32_t clock_mode = (uint32_t)song.g[G_CLOCK];
-    if (midi_clock.mode != clock_mode) {
-        uint32_t internal_beat = (uint32_t)FS * 60u / (uint32_t)song.g[G_BPM];
-        uint32_t old_beat = midi_clock.mode ? MIDI_BEAT_UNITS : internal_beat;
-        uint32_t new_beat = clock_mode ? MIDI_BEAT_UNITS : internal_beat;
-        song.g[G_CLOCK] = (int16_t)midi_clock.mode;
+    if(song.playing || transport_req==1u)resource_release(RES_NOTE_HISTORY);
+    uint32_t selected_clock = (uint32_t)song.g[G_CLOCK];
+    if (midi_clock.selected != selected_clock) {
         seq_stop();
-        song.g[G_CLOCK] = (int16_t)clock_mode;
-        /* Continue and a latched ARP preserve their fractional phase when
-         * crossing between sample time and MIDI musical units. */
-        for (i = 0; i < NTRK; i++) {
-            track_t *t = &trk[i];
-            if (t->seq_pos < 0x7FFFFFFFu)
-                t->seq_pos = (uint32_t)((uint64_t)t->seq_pos * new_beat / old_beat);
-            if (t->arp_pos < 0xFFFFFFFu)
-                t->arp_pos = (uint32_t)((uint64_t)t->arp_pos * new_beat / old_beat);
-            t->arp_off = (uint32_t)((uint64_t)t->arp_off * new_beat / old_beat);
-        }
-        beat_pos = (uint32_t)((uint64_t)beat_pos * new_beat / old_beat);
+        midi_clock_mode(0);
         memset(&midi_clock, 0, sizeof midi_clock);
-        midi_clock.mode = (uint8_t)clock_mode;
+        midi_clock.selected = (uint8_t)selected_clock;
         midi_beat_samples = 0;
     }
+    uint32_t clock_mode = midi_clock.mode;
     if (transport_req == 1u) {
         if (clock_mode)
             midi_clock_transport(0xFAu, fm1_ms);
@@ -1146,7 +1077,12 @@ static void events_block(uint32_t n)
             break;
         mi_r++;
         if (status >= 0xF8u) {
-            if (clock_mode == source) {
+            if (selected_clock == source) {
+                if (status == 0xFAu || status == 0xFBu || status == 0xFCu) {
+                    if (!clock_mode) midi_clock_mode(source);
+                    clock_mode = source;
+                }
+                if (!clock_mode) continue; /* clocks alone cannot claim local transport */
                 if (status == 0xF8u)
                     midi_clock_pulse(ms, time);
                 else {
@@ -1163,6 +1099,7 @@ static void events_block(uint32_t n)
             midi_event(st, ch, d1, d2);
         }
     }
+    if(song.playing)resource_release(RES_NOTE_HISTORY);
     if (clock_mode) {
         if (song.playing) {
             uint32_t last = midi_clock.have_pulse ? midi_clock.last_ms : midi_clock.start_ms;

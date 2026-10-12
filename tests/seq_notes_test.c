@@ -192,13 +192,13 @@ static int control_clashes(void)
     t=clash_setup();memcpy(saved,recording,sizeof saved);chain.running=1;press(B_EDIT);
     bad+=check("song-chain protection also blocks individual note deletion",!memcmp(saved,recording,sizeof saved)&&msg_is("STOP TO EDIT"));
     chain.running=0;
-    for(uint32_t layer=LAYER_FX;layer<LAYER_SCL;layer++) {
+    for(uint32_t layer=LAYER_GLO;layer<LAYER_SCL;layer++) {
         t=clash_setup();memcpy(saved,recording,sizeof saved);uint8_t zoom=ui.note_zoom;
         uint32_t b=LAYERS[layer].btn;
         fm1_in.buttons|=1u<<panel.btn[b];host_pressed|=1u<<panel.btn[b];frame();turn(EN_K4,1);
         int active=ui.ly==layer&&ui.layer==layer;
         fm1_in.buttons&=~(1u<<panel.btn[b]);frame();
-        bad+=check("FX/GLO layers keep their own knobs inside NOTES",active&&ui.note_zoom==zoom&&!memcmp(saved,recording,sizeof saved));
+        bad+=check("GLO layer keep their own knobs inside NOTES",active&&ui.note_zoom==zoom&&!memcmp(saved,recording,sizeof saved));
     }
     return bad;
 }
@@ -217,10 +217,10 @@ static int property_edits_and_mixed_patterns(void)
     turn(EN_K4,-20);bad+=check("VEL changes the highlighted hit's playback velocity",recording[1].vel==70&&recording[1].note==64&&recording[0].vel==100);
     uint32_t length=(uint32_t)recording[1].duration*(1u<<(recording[1].owner>>5));
     turn(EN_K3,1);
-    bad+=check("LENGTH extends one captured note by a step without moving its onset",(uint32_t)recording[1].duration*(1u<<(recording[1].owner>>5))==length+RECORD_UNIT&&recording[1].on==original[1].on&&recording[0].duration==original[0].duration);
+    bad+=check("LENGTH snaps one captured note to the next quarter without moving its onset",(uint32_t)recording[1].duration*(1u<<(recording[1].owner>>5))==(length/(RECORD_UNIT/4u)+1u)*(RECORD_UNIT/4u)&&recording[1].on==original[1].on&&recording[0].duration==original[0].duration);
     hold(B_SAVE);bad+=check("length undo keeps the preceding velocity edit",recording[1].duration==original[1].duration&&recording[1].vel==70);
     fm1_in.buttons|=1u<<panel.btn[B_ENV];host_pressed|=1u<<panel.btn[B_ENV];frame();turn(EN_K3,1);fm1_in.buttons&=~(1u<<panel.btn[B_ENV]);frame();
-    bad+=check("ENV plus LENGTH gives a fine sixteenth-step duration edit",(uint32_t)recording[1].duration*(1u<<(recording[1].owner>>5))==length+RECORD_UNIT/16u&&cur_page()->graph==GR_ROLL);
+    bad+=check("ENV plus LENGTH gives a fine sixteenth-step duration edit",(uint32_t)recording[1].duration*(1u<<(recording[1].owner>>5))==(length/(RECORD_UNIT/16u)+1u)*(RECORD_UNIT/16u)&&cur_page()->graph==GR_ROLL);
     hold(B_SAVE);
     fm1_in.buttons|=1u<<panel.btn[B_SCL];host_pressed|=1u<<panel.btn[B_SCL];frame();turn(EN_K1,2);fm1_in.buttons&=~(1u<<panel.btn[B_SCL]);frame();
     bad+=check("MOVE preserves a captured note's fractional onset, duration and neighbours",ui.cursor==2&&notes_selected(t)==1&&(recording[1].step&63u)==2&&recording[1].on==original[1].on&&recording[1].duration==original[1].duration&&recording[0].vel==100&&recording[2].vel==95);

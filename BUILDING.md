@@ -40,6 +40,35 @@ On Linux x86-64 the toolchain runs natively and Docker is not needed.
 ./build.sh
 ```
 
+`MELODEE_RAM_AUDIO=1 ./build.sh` builds the resident audio performance profile.
+All builds use the dry mixer; external effects and their buffers have been removed.
+The optimized audio ISR, all enabled engine callbacks and their reachable helpers
+execute from ordinary SRAM; `tools/audio_ram.py` preserves existing low-SRAM DSP
+sections and uses volatile indirect calls across the XIP/SRAM boundary. Startup
+copies the additional `.audio_text` section before audio or CPU1 starts. Build
+checks verify every linked audio function's address and reject direct XIP calls
+from that graph. Engine callbacks invoked through function pointers are explicit
+roots, including mono-note handling and key mapping; a new engine callback must
+be classified before the build passes. The hardware PC guard includes both SRAM
+code banks, using the linker-derived `_guard_ram_end`.
+`MELODEE_SIZE=0` cannot be combined with this profile.
+
+The profile retains at least a 64 KiB contiguous resource arena for four engine
+states and off-record note history. Additional SRAM tails remain available.
+Factory banks and cold assets remain in flash; loaded patches and active engine
+state are in SRAM. Old effect values remain readable as inert format padding.
+Run the host suite with `MELODEE_RAM_AUDIO=1` when checking this target variant.
+Both target profiles reject linked effect processors. Host sound regressions
+validate dry output against the original engines with all effect sends off.
+`tools/usb_audio_stats.py --parts` identifies cuts on each of the four tracks.
+The resident profile raises the shared voice budget from sixteen to eighteen
+units while CPU1 is online. An offline replay of the captured Prophet / two-FM6 /
+808 song needs this increase to avoid allocation cuts; the eighteen-unit replay
+recorded no allocation cuts for three minutes without growing memory or recorded event data.
+Normal builds and a retired or unavailable CPU1 retain sixteen units. Per-engine
+caps and overload shedding remain active. Target CPU headroom for the higher
+budget still requires a device measurement; host playback cannot establish it.
+
 `JIELI_TOOLCHAIN` and `AC79_SDK` override the default locations
 (`~/.jieli/toolchain`, `~/fw-AC79_AIoT_SDK`).
 
@@ -63,7 +92,6 @@ Build options (environment; most use `0` or `1`; defaults in `firmware/src/build
 | `MELODEE_SYS_CLK` | 0 | Set to `320` (other values are ignored by `tools/build.py`): retune the SYS PLL at boot, before CPU1 and the audio ISR (hal/fm1_clock.h). JieLi's 320 MHz profile against M-VAVE's 360 one: the same post-div chain at 8/9 of the VCO (sys 360→320, HSB 180→160, LSB 60→53.3, SFC 90→80). TIMER4 (24 MHz crystal), the audio I2S (its own ALNK PLL) and USB/UART (PLL48M) do not move. For the units whose CPU1 misreads SRAM at 360 (below): on those, editor command 79 `count-only` at 320 against 360 is the experiment. An unfamiliar PLL multiplier leaves the boot clock untouched. The retune and rollback each wait on RC16M for at least 20 ms plus the cache handshake (not a PLL lock bit), bounded by 40 ms and a spin limit. A successful rollback raises the undo flag in editor command 79 (v[5]); failed rollback waits in SRAM for watchdog/bootguard recovery. Actual clock and stability require hardware measurement |
 | `MELODEE_SLICE` | 1 | the SLICE engine |
 | `MELODEE_ICONS` | 1 | parameter icons on the knob cards |
-| `MELODEE_FM4` | 0 | the retired DIGITAL engine (4-operator FM) instead of its FM6 conversion |
 
 ## Samples
 
@@ -77,20 +105,17 @@ SAMPLE engine has only the generated drum kit.
 Audio working memory is allocated on demand from the unused part of POOL and
 linker-derived gaps after RAM code, ordinary data and retained state. Allocations
 stay within a single bank and preserve boot records and stack guards. Each
-track reserves only its current engine state; STUT reserves 8 KiB per enabled
-track, while GATE needs no recording buffer. Performance loops reuse the same
-32 KiB capacity as the four stutters. Chorus and reverb retain their tails before
-releasing their delay lines; silent buses skip the delay processing.
+track reserves only its current engine state. The off-record note history uses
+one bounded allocation; no effect processor allocates audio buffers.
 
-Preset browsing keeps names and slot indexes in RAM, with one bank cache for
-general presets, one for FM6 and one shared with the CZ bank reader. Retired FM6
-bank and owned-voice caches are replaced by temporary migration workspace,
-released after conversion. Existing flash and backup formats remain readable.
+Preset browsing keeps names and slot indexes in RAM, with one bank cache shared by
+the general presets and the native FM6, CZ-1 and Prophet banks (the last bank asked for). Melodee 2.0
+reads only the formats written since 1.0; 1.2 rewrote older records at boot.
 
 The build reports both permanent POOL usage and the available working arena,
-and requires at least 152 KiB for simultaneous maximum engine state, recording,
-effects and legacy conversion workspace. The resource tests cover eviction,
-engine transitions, effect tails and resumption, and allocation failure.
+and requires at least 139 KiB for simultaneous maximum engine state, recording
+and note history in normal builds (64 KiB in the resident profile). The resource
+tests cover eviction, engine transitions, and allocation failure.
 
 USB stem buffers are written only for an active capture stream. Derived tuning
 and mixer gains are cached by their effective parameter values, including
@@ -110,7 +135,7 @@ user presets, projects of every format, backup, the keys and knobs, MIDI (USB, T
 control), USB audio, the update entry and loader, the command-line installer, the UI (the real
 drawing code against stubs: every screen in every palette is rendered and checked for clipped or
 overlapping text; PNGs land in `build/ui_new/`), every engine (DRUM, NOISE, PHYS, FM6, SLICE, the
-DIGITAL conversion), the chord keys, the modulation matrix, the FX layer, the reverbs, the SLICER
+DIGITAL conversion), the chord keys, the modulation matrix, retired effect compatibility
 and swing. With `DAISYSP` pointing at a DaisySP checkout, the PHYS models are also compared with
 their floating-point originals; without it that test is skipped.
 
@@ -143,10 +168,10 @@ Or, to install your own build from the web installer, make a local copy of the s
 
 ```
 # Build both variants from the same source; release outputs are kept separately.
-./build.sh --release 1.1.0
-MELODEE_DUAL_CORE=0 ./build.sh --release 1.1.0
-python3 web/make_site.py build/release-1.1.0/melodee-1.1.0.fwsc \
-  build/release-1.1.0-1core/melodee-1.1.0-1core.fwsc 1.1.0 /tmp/melodee-site
+MELODEE_RAM_AUDIO=1 ./build.sh --release 1.2.1
+MELODEE_RAM_AUDIO=1 MELODEE_DUAL_CORE=0 ./build.sh --release 1.2.1
+python3 web/make_site.py build/release-1.2.1/melodee-1.2.1.fwsc \
+  build/release-1.2.1-1core/melodee-1.2.1-1core.fwsc 1.2.1 /tmp/melodee-site
 cd /tmp/melodee-site && python3 -m http.server 8000
 # open http://localhost:8000/webapp/installer/
 ```
@@ -157,10 +182,10 @@ starts, recovery needs [FM-1-transporter](https://github.com/kurogedelic/FM-1-tr
 ## Experimental cache RAM
 
 Builds reclaim seven 4 KiB data-cache ways at `0x01F28000..0x01F2F000`
-(`MELODEE_CACHE_RAM=1`, the default while it is being validated on the device; `MELODEE_CACHE_RAM=0 ./build.sh`
+(`MELODEE_CACHE_RAM=1`, opt-in; normal builds retain all data-cache ways; `MELODEE_CACHE_RAM=0 ./build.sh`
 turns it off), following the AC79 SDK's flash-execution configuration. All instruction-cache ways remain available.
 The first 14 KiB are the UI's (eight undo levels); the rest join the audio allocator, whose worst case still fits
-the SRAM banks alone. Without a passed self-test the UI keeps one undo level. Keep USB audio enabled during
+the SRAM banks alone. Normal builds keep eight undo levels in ordinary SRAM, within the existing arena reserve. Keep USB audio enabled during
 validation.
 
 The boot routine runs wholly in SRAM with interrupts off and CPU1 held. It
@@ -233,6 +258,17 @@ stay on CPU0. Prophet's per-voice sample noise state travels with its voice.
 An isolated voice stays on CPU0. Other engines, effects, MIDI, USB and the screen
 retain their existing execution paths. This is a targeted synth optimization;
 it does not double all firmware throughput.
+
+The FM6, Prophet and synthesized 808 sample loops stay resident in internal
+DSP RAM, shared by all four tracks; two FM6 tracks share code while retaining
+separate voice state and loaded patches. Startup copies the code and saturation
+tables once. Loaded patches and active engine state also live in RAM.
+FM6 output mixing and its DC filter, ordinary track mixing and the master output
+also run from DSP RAM.
+FM6 per-voice control and envelopes are resident too. Other block-rate helpers
+and factory-library browsing may still use flash. The build
+checks kernel/table placement and retains the existing worst-case audio arena
+reserve; neither voices nor recording capacity are reduced to make room.
 
 With an online CPU1, Prophet's polyphony cap is eight and each voice
 costs two of the existing sixteen shared budget units. Eight Prophet voices fill
@@ -336,3 +372,28 @@ build. Verify controls, MIDI timing, audio, patch changes, persistence and updat
 entry on hardware before enabling this in a release. The eight-voice Prophet cap
 is enabled only in this experimental build; validate worst-case patches and
 release tails before adopting it in a release.
+
+## Nightly builds from `next`
+
+The web installer keeps the released standard and single-core packages and
+adds two development builds from `next`: normal dual core at the SPL clock
+(360 MHz), and experimental dual core with `MELODEE_SYS_CLK=320`. The latter
+is a test for crashing units; a stability improvement remains unverified.
+Save a complete backup in the editor before trying a nightly. Selecting
+Standard in the installer returns to the released firmware.
+
+`./build.sh --nightly` stamps the current Git commit into the firmware version
+(`next-<commit>`) and uses development identity `FM-1_900`. Build both variants
+from the same commit; `MELODEE_SYS_CLK=320 ./build.sh --nightly` produces
+`build/melodee-nightly-320.fwsc`, while the normal package is
+`build/melodee-nightly.fwsc`. The installer shows the source commit and UTC
+build time, verifies the selected channel's identity, and locks all choices
+while installing.
+
+The Nightly builds workflow runs on pushes to `next`, manually, and daily at
+02:00 UTC. Its scheduled definition must also exist on GitHub's default branch.
+It checks out `next`, builds both dual-core variants, runs the host/web suite,
+and publishes only after successful checks. Packages, checksums and source
+metadata are available as an Actions artifact and in `gh-pages/firmware`.
+`web/publish_nightly.py` updates the existing Pages checkout while keeping its
+published release packages and editor.

@@ -14,7 +14,7 @@ recording, which is one dry instrument and not a hardware calibration.
 ## Engine and performance
 
 PROPHET has persistent engine ID **19** and replaces ANALOG in the new-sound
-browser. ID 0 still renders legacy ANALOG projects and presets. Retired TRIO,
+browser. ID 0 stays reserved: legacy ANALOG projects and presets keep it and play silent (2.0). Retired TRIO,
 WHEEL and PHYS IDs 6, 7 and 9 remain reserved and preserve saved data; they do
 not render audio. IDs 16–18 are reserved. Engine count is 20. General, FM6 and
 CZ favorites retain frozen collection IDs 16, 17 and 18; Prophet users use 20.
@@ -261,8 +261,11 @@ original frames exactly unless the user edits the patch.
 | FACTORY v1.03 | `9b5beaae2953deed5a50ed5f3cbd78c589e704c35a694fa188e9b27f693b73ca` |
 | USER v1.03 | `1d6e9dec2753a08ac6d07b98f0f4e755e33b41de11dc3bed46fa23217619d232` |
 
-USB native single/edit dumps load the selected track in RAM without an automatic
-flash write. Edit-buffer requests return a native dump; addressed program
+USB native single/edit dumps open the Prophet USER list without loading a track or
+writing flash. Choose a slot, then OCT+ > Import here; occupied destinations ask first.
+All twenty name bytes and native metadata survive the import. The USER sheet's Send
+exports the stored patch; hold OCT+ and scroll for a bulk send or confirmed erase.
+Editor command 95 PUT continues to load a track explicitly. Edit-buffer requests return a native dump; addressed program
 requests read used user slots 1–128. Native parameter NRPN/CC editing is outside
 this prototype; editor command 95 edits the native record. TRS retains its
 existing MIDI-input policy and does not decode native SysEx.
