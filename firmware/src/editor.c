@@ -476,7 +476,7 @@ static void ed_handle(const uint8_t *f, uint32_t n)   /* f: the bytes between F0
             for (i = 0; i < FM1_RAILS; i++)
                 v[i] = fm1_power_get(i);
             v[3] = (uint32_t)fm1_core1_barred(); v[4] = bootguard.failed;
-            v[5] = (uint32_t)fm1_clock_downclock_undo;   /* 1: the boot retune timed out, running at 360 */
+            v[5] = (uint32_t)fm1_clock_downclock_undo;   /* 1: not at 320 (timed out, unfamiliar clock or no proven watchdog) */
             fm1_clock_regs(v + 6);
             v[11] = audio_worker.misread; v[12] = fm1_core1_fault.count;
             v[13] = fm1_cpu_ticks();

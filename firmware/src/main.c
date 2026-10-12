@@ -165,8 +165,10 @@ static void fm1_main(void)
          * (the system clock wobbles while the PLL restarts), so it is called through its
          * function pointer. An unfamiliar boot clock or a settled rollback raises the
          * undo flag in editor command 79. Failed rollback stays in SRAM on RC16M
-         * for watchdog recovery; it never returns here with an unverified PLL. */
-        fm1_clock_downclock_undo = fm1_clock_downclock() != 0;
+         * for watchdog recovery; it never returns here with an unverified PLL.
+         * The retune only runs with the watchdog proven armed (fm1_wdt_arm reads
+         * back): its only unrecoverable path ends in that watchdog. */
+        fm1_clock_downclock_undo = !fm1_wdt_arm(0x0D) || fm1_clock_downclock() != 0;
     }
     lcd_init();
     lcd_fill(0, 0, 240, 240, T_BG);

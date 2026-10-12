@@ -23,7 +23,9 @@
 #define FCLK_SYNC() __asm__ volatile("csync" ::: "memory")
 #define FCLK_RAM RAMFN
 /* The watchdog armed in fm1_cstart resets us; repeated failures enter
- * UBOOT through the existing bootguard. Never return into XIP on RC16M. */
+ * UBOOT through the existing bootguard. The caller gates on fm1_wdt_arm's
+ * read-back, so reaching here means the watchdog is verified on. Never
+ * return into XIP on RC16M. */
 #define FCLK_FAILED() do { for (;;) FCLK_SYNC(); } while (0)
 #else
 #define FCLK_RAM
@@ -75,7 +77,8 @@ static inline __attribute__((always_inline)) int fm1_clock_settle_ram(void)
 /* Returns 0 after retuning (or when disabled), 1 for an unfamiliar boot
  * multiplier left untouched, 2 after a settled rollback. A failed rollback
  * stays in SRAM on RC16M until watchdog recovery, rather than returning to
- * the caller with an unverified PLL selected. */
+ * the caller with an unverified PLL selected. Call only with the watchdog
+ * proven armed (fm1_wdt_arm): the FCLK_FAILED paths below end in it. */
 static FCLK_RAM int fm1_clock_downclock_ram(void)
 {
 #if MELODEE_SYS_CLK == 320

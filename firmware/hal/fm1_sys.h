@@ -5,7 +5,8 @@
  * (no IRQs are enabled yet, so nothing else touches P33).
  *
  *   fm1_reset_reason()   snapshot P3_RST_SRC / RST_SRC (call first thing)
- *   fm1_wdt_arm(t)       reset-mode watchdog, t = 0xA 1 s .. 0xF 32 s
+ *   fm1_wdt_arm(t)       reset-mode watchdog, t = 0xA 1 s .. 0xF 32 s; returns
+ *                        1 armed (verified by read-back), 0 not proven
  *   fm1_wdt_feed()       in the main loop
  *   fm1_reboot()         chip reset through P33 (P3_PR_PWR bit 4)
  *   fm1_enter_uboot()    "usb_update_mode" at 0x01C7FD80 + chip reset
@@ -83,12 +84,22 @@ static void fm1_p33_and(uint32_t a, uint8_t d) { fm1__p33_op(2, a, d); }
 #define FM1_P3_RST_SRC 0x12u
 #define FM1_P3_PR_PWR 0xA0u
 
-static void fm1_wdt_arm(uint8_t t)
+static int fm1_wdt_arm(uint8_t t)
 {
+    /* The P33 transfers time out silently (fm1_p33_timeouts) when the domain
+     * is busy, so an arm can leave the watchdog off and a caller that banks on
+     * the recovery (the 320 retune, fm1_clock.h) would spin unrecovered. Read
+     * back and report: 1 if the register now shows this timeout armed in reset
+     * mode (t | clear | enable), or the writes never landed and the watchdog
+     * found at entry still stands. */
+    uint8_t was = fm1_p33_read(FM1_P3_WDT_CON);
+    uint8_t armed = (uint8_t)((t & 0x0Fu) | 0x50u);
     fm1_p33_write(FM1_P3_WDT_CON, 0);
     fm1_p33_and(FM1_P3_VLD_KEEP, (uint8_t)~0x40u);           /* WDT_EXPT_EN = 0: plain reset */
     fm1_p33_write(FM1_P3_WDT_CON, (uint8_t)((t & 0x0Fu) | 0x40u));   /* timeout, reset mode, clear */
     fm1_p33_or(FM1_P3_WDT_CON, 0x10);                        /* enable */
+    uint8_t now = fm1_p33_read(FM1_P3_WDT_CON);
+    return now == armed || (now == was && (was & 0x10u) != 0u);
 }
 static void fm1_wdt_feed(void) { fm1_p33_or(FM1_P3_WDT_CON, 0x40); }
 static void fm1_wdt_stop(void) { fm1_p33_write(FM1_P3_WDT_CON, 0); }
