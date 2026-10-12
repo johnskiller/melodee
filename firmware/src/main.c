@@ -167,8 +167,11 @@ static void fm1_main(void)
          * undo flag in editor command 79. Failed rollback stays in SRAM on RC16M
          * for watchdog recovery; it never returns here with an unverified PLL.
          * The retune only runs with the watchdog proven armed (fm1_wdt_arm reads
-         * back): its only unrecoverable path ends in that watchdog. */
+         * back): its only unrecoverable path ends in that watchdog. Other builds
+         * leave both the watchdog and the clock exactly as fm1_cstart left them. */
+#if MELODEE_SYS_CLK == 320
         fm1_clock_downclock_undo = !fm1_wdt_arm(0x0D) || fm1_clock_downclock() != 0;
+#endif
     }
     lcd_init();
     lcd_fill(0, 0, 240, 240, T_BG);
