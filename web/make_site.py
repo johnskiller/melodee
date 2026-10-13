@@ -179,6 +179,15 @@ def main(pkg, single, version, out, nightly=None, installer_only=False, rc=None)
         for path, data, identity, filename in rc_files.values():
             (fw / filename).write_bytes(data)
         (fw / "rc.json").write_text(json.dumps(rc_meta, indent=2) + "\n")
+    emu = HERE / "emu"
+    if emu.exists():                                # the browser simulator (the wasm is built by web/emu/build.sh)
+        see = out / "webapp" / "simulator"
+        see.mkdir(parents=True, exist_ok=True)
+        shutil.copy(emu / "index.html", see / "index.html")
+        for f in ("worklet.js", "melodee.wasm"):
+            src = emu / f
+            if src.exists():
+                shutil.copy(src, see / f)
     lic = HERE.parent / "LICENSES"                  # the packages hold JieLi SDK files (Apache-2.0): their
     (fw / "LICENSES").mkdir(exist_ok=True)          # licence travels next to it, with Melodee's own
     names = sorted(f.name for f in lic.glob("*.txt"))
