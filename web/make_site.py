@@ -189,7 +189,7 @@ def main(pkg, single, version, out, nightly=None, installer_only=False, rc=None)
             if src.exists():
                 shutil.copy(src, see / f)
     lic = HERE.parent / "LICENSES"                  # the packages hold JieLi SDK files (Apache-2.0): their
-    (fw / "LICENSES").mkdir(exist_ok=True)          # licence travels next to it, with Melodee's own
+    (fw / "LICENSES").mkdir(exist_ok=True, parents=True)  # licence travels next to it, with Melodee's own
     names = sorted(f.name for f in lic.glob("*.txt"))
     for n in names:
         shutil.copy(lic / n, fw / "LICENSES" / n)
