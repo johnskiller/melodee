@@ -37,9 +37,10 @@
 #endif
 #define MELODEE_PROPHET 1
 #define ENGI_PROPHET 19u /* 16..18 reserved: historical preset namespaces */
+#define ENGI_WT 20u      /* the wavetable engine (eng_wt.c): append, never reorder */
 #define USER_GENERAL 16u
-#define USER_NATIVE_P5 20u
-#define NENGINES 20               /* 13 SLICE and 14 OBXF reserved; 15 native CZ-1 */
+#define USER_NATIVE_P5 21u
+#define NENGINES 21               /* 13 SLICE and 14 OBXF reserved; 15 native CZ-1; 20 WT */
 #define USER_NATIVE_FM 17u
 #define USER_NATIVE_CZ 18u
 #define USER_NONE 256u

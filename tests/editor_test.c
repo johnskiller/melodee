@@ -123,7 +123,7 @@ static int preferences(void)
         host_wire[n - 33] == 0x42 && host_wire[n - 32] == 1 && host_wire[n - 31] == 3 &&
         host_wire[n - 30] == 0x50 && host_wire[n - 29] == 1 && host_wire[n - 28] == NPAT && host_wire[n - 27] == CHAIN_ROWS &&
         host_wire[n - 26] == 0x46 && host_wire[n - 25] == 1 && host_wire[n - 24] == FM6_NFAC &&
-        host_wire[n - 23] == 0 && host_wire[n - 22]==0x43 && host_wire[n - 21]==1 && host_wire[n - 20]==16 && host_wire[n - 19]==1 && host_wire[n - 18]==0 && host_wire[n - 17]==0 && host_wire[n-16]==0x35 && host_wire[n-15]==1 && host_wire[n-14]==19 && host_wire[n-13]==16 && host_wire[n-12]==17 && host_wire[n-11]==18 && host_wire[n-10]==20 && host_wire[n-9]==0 && host_wire[n-8]==1 && host_wire[n-7]==0x4e && host_wire[n-6]==1 && host_wire[n-5]==64 && host_wire[n-4]==0 && host_wire[n-3]==0 && host_wire[n-2]==1);
+        host_wire[n - 23] == 0 && host_wire[n - 22]==0x43 && host_wire[n - 21]==1 && host_wire[n - 20]==16 && host_wire[n - 19]==1 && host_wire[n - 18]==0 && host_wire[n - 17]==0 && host_wire[n-16]==0x35 && host_wire[n-15]==1 && host_wire[n-14]==19 && host_wire[n-13]==16 && host_wire[n-12]==17 && host_wire[n-11]==18 && host_wire[n-10]==21 && host_wire[n-9]==0 && host_wire[n-8]==1 && host_wire[n-7]==0x4e && host_wire[n-6]==1 && host_wire[n-5]==64 && host_wire[n-4]==0 && host_wire[n-3]==0 && host_wire[n-2]==1);
     request(ED_UI_SET, a, 2);
     bad += check("UI_SET updates the actual palette and reports RAM-only saving",
         host_wire[5] == 3 && settings.palette == 2 && T_BG == UI_PALETTES[2].bg);
