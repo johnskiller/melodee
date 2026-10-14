@@ -80,9 +80,9 @@ static uint8_t browse_loads, browse_mark;    /* sound loads so far; at the brows
 #define PREF_ACCEL_OFF 2u
 #define PREF_PICK_OFF 32u
 /* HOME SELECT (the menu): what SELECT turns on HOME, kept in favorites.factory[15][25] (0, any other: BPM) */
-enum { HS_BPM, HS_MOD, HS_LEVEL, HS_SWING, HS_TRANS, HS_CHORD, HS_ARATE, HS_PATTERN, HS_OFF, HS_N };
+enum { HS_BPM, HS_MOD, HS_LEVEL, HS_SWING, HS_TRANS, HS_CHORD, HS_ARATE, HS_PATTERN, HS_ENGINE, HS_OFF, HS_N };
 static const char *const HS_NAME[HS_N] = {"BPM", "MOD WHEEL", "LEVEL", "SWING", "TRANSPOSE", "CHORD", "ARP RATE", "PATTERN",
-                                          "OFF"};
+                                          "ENGINE", "OFF"};
 #define HOME_SELECT (favorites.factory[15][25])
 static uint32_t home_select(void) { return HOME_SELECT < HS_N ? HOME_SELECT : HS_BPM; }
 
