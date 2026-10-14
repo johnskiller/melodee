@@ -399,6 +399,24 @@ static int test_sound_loads(void)
     up_load(3);
     project_load(1);
     bad += check("a project load drops the copy and takes none", undo.trk == 0 && undo_depth == 0);
+    /* the same flow against the unified library with the WT engine (a generic engine past the
+     * natives: the record must stay valid and reload identical) */
+    ui_power_on();
+    track_select(0);
+    set_engine_of(&trk[0], ENGI_WT);
+    trk[0].p[P_E0] = 3;                           /* BANK: VOX */
+    trk[0].p[P_E1] = 77;                          /* MORPH */
+    my_steps(&trk[0]);
+    up_store(4, "WT MINE");
+    bad += check("a WT user preset stores into the shared library", up_used(4) && up_rec(4)->engine == ENGI_WT &&
+                 up_rec(4)->np == P_COUNT);
+    set_engine_of(&trk[0], 3);                    /* leave: a general sound */
+    track_defaults_steps(&trk[0]);
+    before = trk[0];
+    up_load(4);
+    bad += check("a WT user preset loads: engine, bank and morph back, steps kept", trk[0].eng_req == ENGI_WT &&
+                 trk[0].p[P_E0] == 3 && trk[0].p[P_E1] == 77 &&
+                 !memcmp(trk[0].step, before.step, sizeof before.step));
     ui_power_on();
     bad += check("sample engines retired with reserved IDs",!eng_ok(4) && !eng_ok(8) && !eng_ok(13) && !eng_ok(14));
     host_808_kit(t);
