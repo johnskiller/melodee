@@ -218,7 +218,7 @@ function build(name) {
   keys.forEach((k, i) => { hit(k, "", "button"); bindKey(k, i); });
   syncButtons(true);
   syncKeys(true);
-  drawLights(lastLeds);
+  drawLights(lastLeds || [0, 0, 0, 0]);
 }
 
 // ------------------------------------------------------------------ input
