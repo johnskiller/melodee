@@ -214,7 +214,6 @@ static void web_power_on(void)
         *d = 0;
     persist_boot();
     settings_init();
-    oc_boot();
     lcd_init();
     lcd_fill(0, 0, 240, 240, T_BG);
     draw_text_box(0, 94, 240, &AF_L, "MELODEE", T_THEME, 1);
@@ -261,7 +260,6 @@ static void web_frame(void)
     ui_input();
     glo_poll();
     settings_poll();
-    oc_poll();
     melodee_dbg.stage = 2;
     ui_leds();
     ui_draw();
